@@ -11,6 +11,28 @@ const emailRegex = /^[a-z]{1}[a-z0-9._]{1,100}[@]{1}[a-z]{2,15}[.]{1}[a-z]{2,10}
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 
+const redis = require("redis");
+const util = require("util");
+
+const redisClient = redis.createClient(
+  18615,
+  "redis-18615.c212.ap-south-1-1.ec2.cloud.redislabs.com",
+  { no_ready_check: true }
+);
+redisClient.auth("28u5wTyM66KEF7YQerN1IPL0NeMhyKKZ", function (err) {
+  if (err) throw err;
+});
+
+// Log successful connection
+redisClient.on("connect", function () {
+  console.log("Connected to Redis..");
+});
+
+
+
+const getAsync = util.promisify(redisClient.get).bind(redisClient);
+const setAsync = util.promisify(redisClient.set).bind(redisClient);
+
 
 
 
@@ -27,7 +49,7 @@ const transporter = nodemailer.createTransport({
     user: process.env.USER,
     pass: process.env.PASS,
   },
-});
+}); 
 
 
 
@@ -207,20 +229,29 @@ module.exports.logout = function(req, res) {
 
 
 
-
-
 module.exports.getDoctor = async function (req, res) {
   try {
-    let doctorFound = await appointmentModel.find().populate("doctorId")
+    // Check if the data is available in Redis cache
+    const cachedData = await getAsync("doctorData");
+    if (cachedData) {
+      console.log("Data retrieved from Redis cache");
+      res.status(200).send(JSON.parse(cachedData));
+      return;
+    }
+    // If data is not available in Redis cache, fetch it from MongoDB
+    const doctorFound = await appointmentModel.find().populate("doctorId");
     if (doctorFound.length > 0) {
-      res.status(200).send( doctorFound );
+      console.log("Data retrieved from MongoDB");
+      // Store the data in Redis cache for future use with an expiration time of 10 minutes
+      await setAsync("doctorData", JSON.stringify(doctorFound), "EX", 600);
+      res.status(200).send(doctorFound);
     } else {
-        res.status(404).send({ status: false, message: "No such data found " });
+      res.status(404).send({ status: false, message: "No such data found " });
     }
   } catch (error) {
-    res.status(500).send({ status: false, error: error.message }); 
+    res.status(500).send({ status: false, error: error.message });
   }
-}; 
+};
 
  
 
