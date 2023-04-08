@@ -122,6 +122,89 @@ const hashPassword = await bcrypt.hash(password, salt);
  
 
 
+/// Set up the local strategy
+passport.use(new LocalStrategy({
+  usernameField: 'email',
+  passwordField: 'password'
+}, async function(email, password, done) {
+  try {
+    const user = await doctorModel.findOne({ email });
+    if (!user) {
+      return done(null, false, { message: 'Incorrect email' });
+    }
+    const matchPassword = await bcrypt.compare(password, user.password);
+    if (!matchPassword) {
+      return done(null, false, { message: 'Incorrect password' });
+    }
+    return done(null, user);
+  } catch (error) {
+    return done(error);
+  }
+}));
+
+// Serialize user
+passport.serializeUser(function(user, done) {
+  done(null, user._id);
+});
+
+// Deserialize user
+passport.deserializeUser(async function(id, done) {
+  try {
+    const user = await doctorModel.findById(id);
+    done(null, user);
+  } catch (error) {
+    done(error);
+  }
+});
+
+// Middleware to check if user is authenticated
+function isAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.status(401).send({ status: false, message: 'Not authenticated' });
+}
+
+module.exports.login = async function(req, res, next) {
+  try {
+    passport.authenticate('local', async function(err, user, info) {
+      if (err) { return next(err); }
+      if (!user) { return res.status(401).send(info); }
+      const token = jwt.sign(
+        { userId: user._id },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: '24h' }
+      );
+
+      req.session.userId = user._id;
+
+console.log( req.session)
+
+      res.status(200).send({
+        status: true,
+        message: 'Login successful',
+        token,
+        user,
+      });
+    })(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+
+module.exports.logout = function(req, res) {
+  req.session.destroy(function(err) {
+    if (err) {
+      console.error(err);
+      return res.status(500).send({ status: false, error: err.message });
+    }
+    res.status(200).send({ status: true, message: 'Logged out successfully' });
+  });
+};
+
 
 
 
