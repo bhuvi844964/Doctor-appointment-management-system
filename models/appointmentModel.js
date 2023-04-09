@@ -8,7 +8,7 @@ const appointmentSchema = new mongoose.Schema({
         required: true,
         ref: "doctor"
     },
-    timeDuration: {
+    timeDuration: { 
         type: Number,
         required: true,
     },

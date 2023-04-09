@@ -10,16 +10,16 @@ const saltRounds = 10;
 const emailRegex = /^[a-z]{1}[a-z0-9._]{1,100}[@]{1}[a-z]{2,15}[.]{1}[a-z]{2,10}$/;
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
-
+//=============================REDIS===============================================================//
 const redis = require("redis");
 const util = require("util");
 
 const redisClient = redis.createClient(
-  18615,
-  "redis-18615.c212.ap-south-1-1.ec2.cloud.redislabs.com",
+  process.env.REDIS_PORT,
+  process.env.REDIS,
   { no_ready_check: true }
 );
-redisClient.auth("28u5wTyM66KEF7YQerN1IPL0NeMhyKKZ", function (err) {
+redisClient.auth(process.env.REDIS_PASS, function (err) {
   if (err) throw err;
 });
 
@@ -28,12 +28,10 @@ redisClient.on("connect", function () {
   console.log("Connected to Redis..");
 });
 
-
-
 const getAsync = util.promisify(redisClient.get).bind(redisClient);
 const setAsync = util.promisify(redisClient.set).bind(redisClient);
 
-
+//=============================cloudinary===============================================================//
 
 
 cloudinary.config({ 
@@ -43,31 +41,31 @@ cloudinary.config({
 });
 
 
+
+//=============================nodemailer===============================================================//
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.USER,
-    pass: process.env.PASS,
+    user: process.env.NODEMAILER_USER,
+    pass: process.env.NODEMAILER_PASS,
   },
 }); 
 
 
-
 module.exports.createProfile = async (req, res) => {
-  let profileImage = req.files.profileImage;
-
   try {
     let data = req.body;
     let { fullName, email, phone, password, experience, consultationFee, specialization, address, education, gender } = data;
     if (!fullName || fullName == "") { 
       return res.status(400).send({ Status: false, message: "Please provide fullName" })
-  }
+    }
     if (!email || email == "") {
       return res.status(400).send({ Status: false, message: "Please provide email" })
-  }
-  if (!emailRegex.test(email)) {
-    return res.status(400).send({ Status: false, message: "Please enter valid email" })
-  }
+    }
+    if (!emailRegex.test(email)) {
+      return res.status(400).send({ Status: false, message: "Please enter valid email" })
+    }
     let existingUser = await doctorModel.findOne({ email });
     if (existingUser) {
       return res.status(400).send({
@@ -77,48 +75,48 @@ module.exports.createProfile = async (req, res) => {
     }
     if (!password || password == "") {
       return res.status(400).send({ Status: false, message: "Please provide password" })
-  }
-  if (!phone || phone == "") {
-    return res.status(400).send({ status: false, message: "Please provide phone number" });
-  }
-  if (!profileImage || profileImage == "") {
-    return res.status(400).send({ Status: false, message: "Please provide profileImage" })
-}
-if (!experience || experience == "") {
-  return res.status(400).send({ status: false, message: "Please provide experience" });
-}
+    }
+    if (!phone || phone == "") {
+      return res.status(400).send({ status: false, message: "Please provide phone number" });
+    }
+    if (!req.files || !req.files.profileImage) {
+      return res.status(400).send({ Status: false, message: "Please provide profileImage" })
+    }
+    let profileImage = req.files.profileImage;
+    if (!experience || experience == "") {
+      return res.status(400).send({ status: false, message: "Please provide experience" });
+    }
 
-if (!consultationFee || consultationFee == "") {
-  return res.status(400).send({ status: false, message: "Please provide consultation fee" });
-}
+    if (!consultationFee || consultationFee == "") {
+      return res.status(400).send({ status: false, message: "Please provide consultation fee" });
+    }
 
-if (!specialization || specialization == "") {
-  return res.status(400).send({ status: false, message: "Please provide specialization" });
-}
+    if (!specialization || specialization == "") {
+      return res.status(400).send({ status: false, message: "Please provide specialization" });
+    }
 
-if (!address || address == "") {
-  return res.status(400).send({ status: false, message: "Please provide address" });
-}
+    if (!address || address == "") {
+      return res.status(400).send({ status: false, message: "Please provide address" });
+    }
 
-if (!education || education == "") {
-  return res.status(400).send({ Status: false, message: "Please provide education" })
-}
+    if (!education || education == "") {
+      return res.status(400).send({ Status: false, message: "Please provide education" })
+    }
 
-if (!gender || gender == "") {
-  return res.status(400).send({ Status: false, message: "Please provide gender" })
-}
-if(gender){
-if(!( ["Male", "Female", "Other"].includes(gender))) {
-  return res.status(400).send({ Status: false, message: "Gender must be Male , Female and Other " })
-}
-}
+    if (!gender || gender == "") {
+      return res.status(400).send({ Status: false, message: "Please provide gender" })
+    }
+    if(gender){
+      if(!( ["Male", "Female", "Other"].includes(gender))) {
+        return res.status(400).send({ Status: false, message: "Gender must be Male , Female and Other " })
+      }
+    }
 
-
-if (profileImage.length == 0){
-  return res.status(400).send({ status: false, message: "upload profile image" });
-}
-const salt = await bcrypt.genSalt(saltRounds);
-const hashPassword = await bcrypt.hash(password, salt);
+    if (profileImage.length == 0){
+      return res.status(400).send({ status: false, message: "upload profile image" });
+    }
+    const salt = await bcrypt.genSalt(saltRounds);
+    const hashPassword = await bcrypt.hash(password, salt);
     const result = await cloudinary.uploader.upload(profileImage.tempFilePath, { resource_type: "auto" });
     const product = {
       fullName,
@@ -215,17 +213,22 @@ console.log( req.session)
 };
 
 
-
+             
 
 module.exports.logout = function(req, res) {
+ 
   req.session.destroy(function(err) {
     if (err) {
       console.error(err);
       return res.status(500).send({ status: false, error: err.message });
     }
-    res.status(200).send({ status: true, message: 'Logged out successfully' });
+   
+     res.status(200).send({ status: true, message: 'Logged out successfully' });
+  
   });
 };
+
+
 
 
 
