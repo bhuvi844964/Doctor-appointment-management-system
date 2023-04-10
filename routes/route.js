@@ -26,6 +26,9 @@ router.get("/getDoctoreById/:doctorId", doctorController.getDoctorById)
 router.post('/forgot-password',  doctorController.getForgotPassword)
 
 router.post('/reset-password', doctorController.resetPassword)
+
+
+router.put('/doctorUpdate/:doctorId', doctorController.doctorUpdate)
  
 
 
